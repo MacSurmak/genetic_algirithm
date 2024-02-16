@@ -6,147 +6,20 @@ import random
 import time
 import cv2
 import matplotlib
-import io
 import multiprocessing
 
-from matplotlib.cm import ScalarMappable
-from mpl_toolkits.mplot3d import Axes3D
 from pyvdwsurface import vdwsurface
-from deap import base, algorithms
+from deap import base
 from deap import creator
-from deap import tools
 from scipy.spatial import distance
-from tqdm import tqdm
-from matplotlib.animation import FuncAnimation
-from matplotlib.colors import ListedColormap, LinearSegmentedColormap, Normalize
 from datetime import datetime
-from itertools import repeat
+from deap import tools
+from algorithms import eaSimpleElitism, mutGaussianDegr, discrete_derivative
 
 try:
     from collections.abc import Sequence
 except ImportError:
     from collections import Sequence
-
-from deap import tools
-from deap.algorithms import varAnd
-
-
-def eaSimpleElitism(population, toolbox, cxpb, mutpb, ngen, stats=None,
-                    halloffame=None, verbose=__debug__, callback=None):
-    """Переделанный алгоритм eaSimple с элементом элитизма
-    """
-
-    time_start = time.time()
-
-    logbook = tools.Logbook()
-    logbook.header = ['gen', 'nevals', 'time'] + (stats.fields if stats else [])
-
-    # Evaluate the individuals with an invalid fitness
-    invalid_ind = [ind for ind in population if not ind.fitness.valid]
-    fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
-    for ind, fit in zip(invalid_ind, fitnesses):
-        ind.fitness.values = fit
-
-    if halloffame is not None:
-        halloffame.update(population)
-
-    hof_size = halloffame.maxsize if halloffame.items else 0
-    while len(halloffame.items) < hof_size:
-        halloffame.insert(halloffame[-1])
-
-    record = stats.compile(population) if stats else {}
-    dur = round(time.time() - time_start, 2)
-    logbook.record(gen=0, nevals=len(invalid_ind), time=dur, **record)
-    if verbose:
-        print(logbook.stream)
-
-    # Begin the generational process
-    for gen in range(1, ngen + 1):
-
-        time_start = time.time()
-
-        # Select the next generation individuals
-        offspring = toolbox.select(population, len(population) - hof_size)
-
-        # Vary the pool of individuals
-        offspring = varAnd(offspring, toolbox, cxpb, mutpb)
-
-        # Evaluate the individuals with an invalid fitness
-        invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
-        fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
-        for ind, fit in zip(invalid_ind, fitnesses):
-            ind.fitness.values = fit
-
-        offspring.extend(halloffame.items)
-
-        # Update the hall of fame with the generated individuals
-        if halloffame is not None:
-            halloffame.update(offspring)
-
-        # Replace the current population by the offspring
-        population[:] = offspring
-
-        if callback:
-            callback[0](*callback[1])
-
-        # Append the current generation statistics to the logbook
-        record = stats.compile(population) if stats else {}
-        dur = round(time.time() - time_start, 2)
-        logbook.record(gen=gen, nevals=len(invalid_ind), time=dur, **record)
-
-        if verbose:
-            print(logbook.stream)
-
-    return population, logbook
-
-
-def mutGaussianDegr(individual, mu, sigma, indpb):
-    """This function applies a gaussian mutation of mean *mu* and standard
-    deviation *sigma* on the input individual. This mutation expects a
-    :term:`sequence` individual composed of real valued attributes.
-    The *indpb* argument is the probability of each attribute to be mutated.
-
-    :param individual: Individual to be mutated.
-    :param mu: Mean or :term:`python:sequence` of means for the
-               gaussian addition mutation.
-    :param sigma: Standard deviation or :term:`python:sequence` of
-                  standard deviations for the gaussian addition mutation.
-    :param indpb: Independent probability for each attribute to be mutated.
-    :returns: A tuple of one individual.
-
-    This function uses the :func:`~random.random` and :func:`~random.gauss`
-    functions from the python base :mod:`random` module.
-    """
-    size = len(individual)
-    if not isinstance(mu, Sequence):
-        mu = repeat(mu, size)
-    elif len(mu) < size:
-        raise IndexError("mu must be at least the size of individual: %d < %d" % (len(mu), size))
-    if not isinstance(sigma, Sequence):
-        sigma = repeat(sigma, size)
-    elif len(sigma) < size:
-        raise IndexError("sigma must be at least the size of individual: %d < %d" % (len(sigma), size))
-
-    for i, m, s in zip(range(size), mu, sigma):
-        if random.random() < indpb:
-            if individual[i] == 0:
-                individual[i] += random.gauss(m, s)
-            elif random.random() < 0.1:
-                individual[i] = 0
-            else:
-                individual[i] += random.gauss(m, s)
-
-    return individual,
-
-
-def discrete_derivative(pots):
-    deriv = []
-    for pot in range(len(pots)):
-        if pot < len(pots) - 1:
-            deriv.append(pots[pot + 1] - pots[pot])
-        else:
-            deriv.append(pots[pot] - pots[pot - 1])
-    return deriv
 
 
 class Can:
@@ -206,10 +79,6 @@ class Can:
         for i in [14, 13, 11, 10, 9, 8, 6, 5, 4, 3, 2, 20, 21, 22, 23, 24, 26, 27, 28, 29, 31, 32, 33, 34, 36, 37]:
             self.chain_coordinates.append(self.atoms[i - 1])
 
-        # self.chain_coordinates = []
-        # for i in [4, 3, 2, 10, 11, 12, 13, 15, 16, 17, 18, 20, 21, 22, 23, 24, 26, 27, 28, 29, 31, 32, 33, 41, 39, 40]:
-        #     self.chain_coordinates.append(self.atoms[i - 1])
-
         self.distances_df = pd.DataFrame()
 
         self.counter = 0
@@ -224,6 +93,7 @@ class Can:
         self.distances_df_inv = (1 / (self.distances_df * 1.889725988579)).T  # переводим в боры
 
     def evaluate_potentials(self, charges):
+        """Метод вычисления потенциалов через таблицу расстояний"""
         a = []
         for i in self.names:
             a1 = (np.array(charges) / self.charge_scale_factor) * self.distances_df_inv
@@ -231,37 +101,37 @@ class Can:
         return np.array(a)
 
     def fitness(self, individual):
+        """Метод оценки приспособленности
+        Здесь реализовано две метрики - оценка близости к искомому графику и оценка совпадения формы кривой"""
         new_pots = self.evaluate_potentials(individual)
         new_deriv = np.array(discrete_derivative(new_pots))
-        deriv_fitness = sum(((new_deriv - self.experimental_derivative) / self.experimental_derivative.mean()) ** 2)
-        value_fitness_exact = sum((new_pots - self.experimental_potentials) ** 2)
+        deriv_fitness = sum(((new_deriv - self.experimental_derivative) / self.experimental_derivative.mean()) ** 2)  # нормируем
         value_fitness_std = 0
         for v in range(len(new_pots)):
             if self.upper[v] > v > self.lower[v]:
-                value_fitness_std += (((new_pots[v] - self.experimental_potentials[v]) / self.experimental_potentials.mean()) ** 2) / 10
+                value_fitness_std += (((new_pots[v] - self.experimental_potentials[v]) / self.experimental_potentials.mean()) ** 2) / 10# нормируем
             else:
-                value_fitness_std += (((new_pots[v] - self.experimental_potentials[v]) / self.experimental_potentials.mean()) ** 2)
-                # value_fitness_std += min((new_pots[v] - self.upper[v]) ** 2, (new_pots[v] - self.lower[v]) ** 2)
+                value_fitness_std += (((new_pots[v] - self.experimental_potentials[v]) / self.experimental_potentials.mean()) ** 2)# нормируем
 
         return (value_fitness_std,
                 deriv_fitness,)  # кортеж
 
     def plot(self, ax, ax3d, best, other, charges):
+        """Метод отрисовки всего GUI через matplotlib"""
 
         # target plot with stuff
         ax.plot(np.arange(26), self.experimental_potentials, label="experimental")
-        # ax.plot(np.arange(26), self.experimental_derivative, c="green") # derivative
+        # ax.plot(np.arange(26), self.experimental_derivative, c="green")  # derivative plot, uncomment if needed
+        # ax.plot(np.arange(26), discrete_derivative(best), c="red")  # derivative
 
-        ax.fill_between(np.arange(26), self.lower, self.upper, color='lightblue', alpha=.25, label="std. deviation")
+        ax.fill_between(np.arange(26), self.lower, self.upper, color='lightblue', alpha=.25, label="std. deviation")  # standard deviation
 
         # other individuals
         for i in other:
             ax.plot(np.arange(26), i, alpha=.01, color="grey")
 
         # best individual
-        # ax.plot(np.arange(26), best, alpha=.01, color="grey", label="predicted")
         ax.plot(np.arange(26), best, label="predicted")
-        # ax.plot(np.arange(26), discrete_derivative(best), c="red") # derivative
 
         # plot points
         colored_points = pd.DataFrame(self.vdwpoints)
@@ -270,10 +140,7 @@ class Can:
 
         ax3d.scatter(colored_points[0], colored_points[1], colored_points[2], marker='.', s=1,
                      c=colored_points["charges"], cmap="bwr", norm=normalize)
-        # create a ScalarMappable object
         sm = plt.cm.ScalarMappable(cmap="bwr", norm=plt.Normalize(-self.max_charge, self.max_charge))
-
-        # add colorbar with specified limits
         labels = np.linspace(-self.max_charge, self.max_charge, 9).round(8)
 
         if not self.cb:
@@ -295,13 +162,14 @@ class Can:
             plt.savefig(f"{self.working_dir}/figures/gen{self.generation:04d}.png", dpi=500)
 
     def genetic_algorithm(self, population_size, p_crossover, p_mutation, max_generations, tournsize, hof_size):
+        """Непосредственно генетический алгоритм"""
 
         start_time = time.time()
         now = datetime.now()
         date_time_str = now.strftime("%Y%m%d%H%M%S")
 
         if self.mkdir:
-            self.working_dir = f"{date_time_str}_{len(self.vdwpoints)}_points_{population_size}_inds_{max_generations}_gens_{p_mutation}_pm_{p_crossover}_pc"
+            self.working_dir = f"output/{date_time_str}_{len(self.vdwpoints)}_points_{population_size}_inds_{max_generations}_gens_{p_mutation}_pm_{p_crossover}_pc"
             os.mkdir(self.working_dir)
             os.mkdir(f"{self.working_dir}/figures")
 
@@ -316,9 +184,9 @@ class Can:
         pool = multiprocessing.Pool()
         toolbox.register("map", pool.map)
 
-        # toolbox.register("zeroOrOne", random.randint, -self.charge_nsteps, self.charge_nsteps)
+        # toolbox.register("zeroOrOne", random.randint, -self.charge_nsteps, self.charge_nsteps)  # создание особи с рандомными зарядами
         # toolbox.register("zeroOrOne", np.random.normal, loc=0.0, scale=self.charge_nsteps)
-        toolbox.register("zeroOrOne", random.randint, 0, 0)
+        toolbox.register("zeroOrOne", random.randint, 0, 0)  # создание особи с нулевыми зарядами
         toolbox.register("individualCreator", tools.initRepeat, creator.Individual, toolbox.zeroOrOne, npoints)
         toolbox.register("populationCreator", tools.initRepeat, list, toolbox.individualCreator)
 
@@ -327,13 +195,14 @@ class Can:
         toolbox.register("evaluate", self.fitness)
         toolbox.register("select", tools.selTournament, tournsize=tournsize)
         toolbox.register("mate", tools.cxOnePoint)
-        toolbox.register("mutate", mutGaussianDegr, mu=0, sigma=self.charge_nsteps, indpb=2.0 / npoints)
+        toolbox.register("mutate", mutGaussianDegr, mu=0, sigma=self.charge_nsteps, indpb=2.0 / npoints)  # частота мутаций - примерно две замены на геном
 
         stats = tools.Statistics(lambda ind: ind.fitness.values)
         stats.register("best", np.min)
         stats.register("avg", np.mean)
 
         def show(ax, ax3d):
+            """Функция обновления графиков"""
 
             ax.clear()
             try:
@@ -344,6 +213,8 @@ class Can:
                 charges = np.zeros(len(self.vdwpoints))
 
             other = []
+            # До распараллеливания эта часть считалась даже дольше, чем сам генетический алгоритм...
+            # а она нужна, чтобы построить на графике всю остальную популяцию
             with multiprocessing.Pool() as pool:
                 for result in pool.map(self.evaluate_potentials, population):
                     other.append(result)
@@ -361,6 +232,7 @@ class Can:
 
         show(ax, ax3d)
 
+        # Собственно цикл генетического алгоритма
         population, logbook = eaSimpleElitism(population, toolbox,
                                               cxpb=p_crossover,
                                               mutpb=p_mutation,
@@ -378,6 +250,7 @@ class Can:
         best = np.array(hof.items[0]) / self.charge_scale_factor
         print(best)
 
+        # Создание видео из фреймов
         if self.mkdir:
             images = [img for img in os.listdir(f"{self.working_dir}/figures") if img.endswith(".png")]
             images.sort()
@@ -393,16 +266,15 @@ class Can:
         plt.ioff()
         plt.show()
 
-        # ppl = pd.DataFrame(population)
-        # ppl_mean_charges = ppl.mean() / self.charge_scale_factor
         charged_points = pd.DataFrame(self.vdwpoints)
         distances_charged = self.distances_df
-        # charged_points["charge"] = ppl_mean_charges
-        # distances_charged["charge"] = ppl_mean_charges
+
         charged_points["charge"] = best
         charged_points_only = charged_points[charged_points["charge"] != 0]
         distances_charged["charge"] = best
         distances_charged_only = distances_charged[distances_charged["charge"] != 0]
+
+        # сохранение логов и файлов с результатами
         if self.mkdir:
             charged_points.to_csv(f'{self.working_dir}/charged_points.csv', index=False)
             distances_charged.to_csv(f'{self.working_dir}/distances_charged.csv', index=False)
@@ -433,30 +305,3 @@ class Can:
         if self.mkdir:
             plt.savefig(f"{self.working_dir}/fitness.png")
         plt.show()
-
-
-can = Can(vdwdensity=25, max_charge=0.01, charge_nsteps=10000, mkdir=True)
-can.genetic_algorithm(population_size=250,
-                      p_crossover=0.9,
-                      p_mutation=0.4,
-                      max_generations=500,
-                      tournsize=15,
-                      hof_size=10)
-
-# Для тестов
-
-# can = Can(vdwdensity=10, max_charge=0.03, charge_nsteps=10000, mkdir=False)
-# can.genetic_algorithm(population_size=50,
-#                       p_crossover=0.9,
-#                       p_mutation=0.4,
-#                       max_generations=50,
-#                       tournsize=5,
-#                       hof_size=3)
-
-# can = Can(vdwdensity=1, max_charge=0.1, charge_nsteps=10000, mkdir=False)
-# can.genetic_algorithm(population_size=50,
-#                       p_crossover=0.9,
-#                       p_mutation=0.3,
-#                       max_generations=10,
-#                       tournsize=5,
-#                       hof_size=2)
