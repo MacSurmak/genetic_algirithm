@@ -1,18 +1,64 @@
 import random
 import time
+import numpy as np
 
 from itertools import repeat
+
+import pandas as pd
 from deap import tools
 from deap.algorithms import varAnd
+
 try:
     from collections.abc import Sequence
 except ImportError:
     from collections import Sequence
 
 
-def eaSimpleElitism(population, toolbox, cxpb, mutpb, ngen, stats=None,
-                    halloffame=None, verbose=__debug__, callback=None):
-    """Переделанный алгоритм eaSimple с элементом элитизма
+def create_curve(filename: str) -> None:
+    """
+    Reads potentials file from MD and writes a file containing mean and std deviation
+    :param filename: filename of MD table
+    :return: None
+    """
+    df = pd.read_excel(filename).drop("Unnamed: 0", axis=1)
+    filename = filename.split('.')[0]
+    mean = df.mean()
+    upper = mean + df.std()
+    lower = mean - df.std()
+    number = np.arange(26)
+    pd.DataFrame({"number": number, "mean": mean, "upper": upper, "lower": lower}).to_csv(f"{filename}_curve.csv")
+
+
+def discrete_derivative(pots: np.ndarray) -> np.array:
+    """
+    Calculates "discrete derivative" of a plot - just differences between n+1 and n points
+    :param pots: potentials array
+    :return: derivative array
+    """
+    deriv = []
+    for pot in range(len(pots)):
+        if pot < len(pots) - 1:
+            deriv.append(pots[pot + 1] - pots[pot])
+        else:
+            # deriv.append(pots[pot] - pots[pot - 1])
+            pass
+    return np.array(deriv)
+
+
+def ea_simple_elitism(population, toolbox, cxpb, mutpb, ngen, stats=None,
+                      halloffame=None, verbose=__debug__, callback=None):
+    """
+    Rewritten eaSimple algorithm from deap. Includes elitism mechanics: not to lose best of individuals.
+    :param population: population
+    :param toolbox: toolbox
+    :param cxpb: crossover probability
+    :param mutpb: mutation probability (for a single individual whether mutate or not)
+    :param ngen: number of generations
+    :param stats: stats
+    :param halloffame: hall of fame object
+    :param verbose: verbose mode
+    :param callback: function to execute every generation
+    :return: final population, logbook
     """
 
     time_start = time.time()
@@ -79,8 +125,14 @@ def eaSimpleElitism(population, toolbox, cxpb, mutpb, ngen, stats=None,
     return population, logbook
 
 
-def mutGaussianDegr(individual, mu, sigma, indpb):
-    """Переделанный алгоритм mutGaussian с добавлением делеций
+def mut_gaussian_degr(individual, mu, sigma, indpb):
+    """
+    Rewritten mutGaussian algorithm from deap. Includes mechanics of charge reset
+    :param individual: individual
+    :param mu: mu of gaussian function
+    :param sigma: sigma of gaussian function
+    :param indpb: probability of mutation for a single gene
+    :return: individual
     """
     size = len(individual)
     if not isinstance(mu, Sequence):
@@ -102,13 +154,3 @@ def mutGaussianDegr(individual, mu, sigma, indpb):
                 individual[i] += random.gauss(m, s)
 
     return individual,
-
-
-def discrete_derivative(pots):
-    deriv = []
-    for pot in range(len(pots)):
-        if pot < len(pots) - 1:
-            deriv.append(pots[pot + 1] - pots[pot])
-        else:
-            deriv.append(pots[pot] - pots[pot - 1])
-    return deriv

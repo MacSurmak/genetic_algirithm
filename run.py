@@ -13,28 +13,28 @@ max_generations - длительность симуляции в поколен�
 tournsize - число особей для турнирного отбора. Я ставлю не больше 10% от популяции
 hof_size - размер зала славы. В нем сохраняются лучшие решения, чтобы не терять их и не переоткрывать повторно
 """
-can = Can(vdwdensity=25, max_charge=0.01, charge_nsteps=10000, mkdir=True)
-can.genetic_algorithm(population_size=250,
-                      p_crossover=0.9,
-                      p_mutation=0.4,
-                      max_generations=500,
-                      tournsize=15,
-                      hof_size=10)
-
-# Для тестов
-
-# can = Can(vdwdensity=10, max_charge=0.03, charge_nsteps=10000, mkdir=False)
-# can.genetic_algorithm(population_size=50,
+# can = Can(max_charge=0.01, density=25, mdfile='WT_pots.xlsx', mkdir=True)
+# can.genetic_algorithm(population_size=250,
 #                       p_crossover=0.9,
 #                       p_mutation=0.4,
-#                       max_generations=50,
-#                       tournsize=5,
-#                       hof_size=3)
+#                       max_generations=100,
+#                       tournsize=15,
+#                       hof_size=10)
 
-# can = Can(vdwdensity=1, max_charge=0.1, charge_nsteps=10000, mkdir=False)
-# can.genetic_algorithm(population_size=50,
+# can = Can(max_charge=0.1, density=25, mdfile='WT_pots.xlsx', mkdir=True)
+# can.genetic_algorithm(population_size=250,
 #                       p_crossover=0.9,
-#                       p_mutation=0.3,
-#                       max_generations=10,
-#                       tournsize=5,
-#                       hof_size=2)
+#                       p_mutation=0.4,
+#                       max_generations=100,
+#                       tournsize=15,
+#                       hof_size=10)
+
+# For tests
+
+can = Can(max_charge=0.01, density=25, mdfile='WT_pots.xlsx', mkdir=True)
+can.genetic_algorithm(population_size=50,
+                      p_crossover=0.9,
+                      p_mutation=0.4,
+                      max_generations=5,
+                      tournsize=5,
+                      hof_size=3)
