@@ -21,12 +21,13 @@ except ImportError:
 
 
 class Can:
-    def __init__(self, mdfile='WT_pots.xlsx', mkdir=False, max_charge=0.1, density=1):
+    def __init__(self, mdfile='WT_pots.xlsx', mkdir=False, max_charge=0.1, density=1, low_detail=False):
         """
         Creates object
         :param mdfile: name of MD potentials file
         :param mkdir: whether write outputs or not
         :param max_charge: std deviation of random charge generation
+        :param low_detail: whether to use low detail mode (no unnecessary calculations)
         """
 
         self.mkdir = mkdir
@@ -34,19 +35,20 @@ class Can:
         self.working_dir = ""
         self.generation = 0
         self.basename = mdfile.split('.')[0]
+        self.low_detail = low_detail
 
         self.names = ["O4", "C3", "C2", "C10", "C11", "C12", "C13", "C15", "C16",
                       "C17", "C18", "C20", "C21", "C22", "C23", "C24", "C26", "C27",
                       "C28", "C29", "C31", "C32", "C33", "C41", "C39", "O40"]
 
         try:
-            experimental_data = pd.read_csv(f"{self.basename}_curve.csv")
+            experimental_data = pd.read_csv(f"data/{self.basename}_curve.csv")
             print("Curve data found, skipping re-calculating")
         except FileNotFoundError:
             try:
                 print("Trying to calculate curve parameters from MD file...")
                 create_curve(mdfile)
-                experimental_data = pd.read_csv(f"{self.basename}_curve.csv")
+                experimental_data = pd.read_csv(f"data/{self.basename}_curve.csv")
             except FileNotFoundError:
                 print("No MD data provided")
                 sys.exit(1)
@@ -78,8 +80,8 @@ class Can:
     def evaluate_potentials(self, charges: np.ndarray) -> np.ndarray:
         """
         Method for evaluating potentials using a distances table
-        :param charges: charges
-        :return: new potentials array
+        :param charges: charges (array of charge values)
+        :return: new potentials array (26 points)
         """
         a = []
 
@@ -120,14 +122,14 @@ class Can:
         return (value_fitness_std,
                 deriv_fitness,)  # tuple
 
-    def plot(self, ax, ax3d, best, other, charges):
+    def plot(self, ax: plt.axes, ax3d: plt.axes, best: np.ndarray, other: np.ndarray, charges: np.ndarray) -> None:
         """
         GUI creation
-        :param ax:
-        :param ax3d:
-        :param best:
-        :param other:
-        :param charges:
+        :param ax: plt axes
+        :param ax3d: plt 3d axes
+        :param best: potentials of the best individual (or any other you want to plot)
+        :param other: numpy 2d array with other individuals
+        :param charges: charges of the best individual (or any other you want to plot)
         :return:
         """
 
@@ -140,9 +142,10 @@ class Can:
         # ax.plot(np.arange(25), self.experimental_derivative, c="green")
         # ax.plot(np.arange(25), discrete_derivative(best), c="red")
 
-        # other individuals (a lot of grey lines)
-        for i in other:
-            ax.plot(np.arange(26), i, alpha=.01, color="grey")
+        if not self.low_detail:
+            # other individuals (a lot of grey lines)
+            for i in other:
+                ax.plot(np.arange(26), i, alpha=.01, color="grey")
 
         # best individual (orange line)
         ax.plot(np.arange(26), best, label="predicted")
@@ -150,6 +153,8 @@ class Can:
         # plot points in 3d
         colored_points = pd.DataFrame(self.vdwpoints)
         colored_points["charges"] = charges
+        if self.low_detail:
+            colored_points = colored_points[colored_points["charges"] != 0]
 
         normalize = matplotlib.colors.Normalize(vmin=-self.max_charge, vmax=self.max_charge)
 
@@ -177,7 +182,8 @@ class Can:
         if self.mkdir:
             plt.savefig(f"{self.working_dir}/figures/gen{self.generation:04d}.png", dpi=500)
 
-    def genetic_algorithm(self, population_size, p_crossover, p_mutation, max_generations, tournsize, hof_size):
+    def genetic_algorithm(self, population_size, p_crossover, p_mutation,
+                          max_generations, tournsize, hof_size):
         """
         Genetic algorithm itself
         :param population_size:
@@ -234,13 +240,15 @@ class Can:
 
         def show(ax, ax3d):
             """
-            Plot update function
-            :param ax:
-            :param ax3d:
+            Plot update function (show every generation)
+            :param ax: axes
+            :param ax3d: 3d axes
             :return:
             """
 
             ax.clear()
+            ax3d.clear()
+
             try:
                 new_best = self.evaluate_potentials(hof.items[0])
                 charges = np.array(hof.items[0])
@@ -249,11 +257,13 @@ class Can:
                 charges = self.start_charges
 
             other = []
-            # Before multiprocessing this part took even more time than the whole genetic algorithm...
-            # it calculates the whole population potentials
-            with multiprocessing.Pool() as pool:
-                for result in pool.map(self.evaluate_potentials, population):
-                    other.append(result)
+            if not self.low_detail:
+                # Before multiprocessing this part took even more time than the whole genetic algorithm...
+                # it calculates the whole population potentials
+                with multiprocessing.Pool() as pool:
+                    for result in pool.map(self.evaluate_potentials, population):
+                        other.append(result)
+                other = np.array(other)
 
             self.plot(ax, ax3d, new_best, other, charges)
             self.generation += 1

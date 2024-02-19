@@ -20,13 +20,13 @@ def create_curve(filename: str) -> None:
     :param filename: filename of MD table
     :return: None
     """
-    df = pd.read_excel(filename).drop("Unnamed: 0", axis=1)
+    df = pd.read_excel(f"data/{filename}").drop("Unnamed: 0", axis=1)
     filename = filename.split('.')[0]
     mean = df.mean()
     upper = mean + df.std()
     lower = mean - df.std()
     number = np.arange(26)
-    pd.DataFrame({"number": number, "mean": mean, "upper": upper, "lower": lower}).to_csv(f"{filename}_curve.csv")
+    pd.DataFrame({"number": number, "mean": mean, "upper": upper, "lower": lower}).to_csv(f"data/{filename}_curve.csv")
 
 
 def discrete_derivative(pots: np.ndarray) -> np.array:

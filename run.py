@@ -31,7 +31,7 @@ hof_size - размер зала славы. В нем сохраняются л
 
 # For tests
 
-can = Can(max_charge=0.01, density=25, mdfile='WT_pots.xlsx', mkdir=True)
+can = Can(max_charge=0.01, density=25, mdfile='WT_pots.xlsx', mkdir=True, low_detail=False)
 can.genetic_algorithm(population_size=50,
                       p_crossover=0.9,
                       p_mutation=0.4,
