@@ -143,8 +143,8 @@ class Can:
                         label="std. deviation")  # standard deviation
 
         # derivative plot, uncomment if needed
-        ax.plot(np.arange(25), self.experimental_derivative, c="green")
-        ax.plot(np.arange(25), discrete_derivative(best), c="red")
+        # ax.plot(np.arange(25), self.experimental_derivative, c="green")
+        # ax.plot(np.arange(25), discrete_derivative(best), c="red")
 
         if not self.low_detail:
             # other individuals (a lot of grey lines)
