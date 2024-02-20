@@ -21,21 +21,3 @@ can.genetic_algorithm(population_size=250,
                       max_generations=1000,
                       tournsize=15,
                       hof_size=5)
-
-# can = Can(max_charge=0.1, density=25, mdfile='WT_pots.xlsx', mkdir=True)
-# can.genetic_algorithm(population_size=250,
-#                       p_crossover=0.9,
-#                       p_mutation=0.4,
-#                       max_generations=100,
-#                       tournsize=15,
-#                       hof_size=10)
-
-# For tests
-
-# can = Can(max_charge=0.01, density=25, mdfile='WT_pots.xlsx', mkdir=True, low_detail=False)
-# can.genetic_algorithm(population_size=50,
-#                       p_crossover=0.9,
-#                       p_mutation=0.4,
-#                       max_generations=5,
-#                       tournsize=5,
-#                       hof_size=3)
