@@ -21,7 +21,7 @@ except ImportError:
 
 
 class Can:
-    def __init__(self, mdfile='WT_pots.xlsx', mkdir=False, max_charge=0.1, density=1, low_detail=False):
+    def __init__(self, mdfile='WT_pots.xlsx', pointfile=None, mkdir=False, max_charge=0.1, density=1, low_detail=False):
         """
         Creates object
         :param mdfile: name of MD potentials file
@@ -60,7 +60,10 @@ class Can:
         self.experimental_derivative = discrete_derivative(self.experimental_potentials)
 
         try:
-            self.vdwpoints = np.array(pd.read_csv(f"vdwpoints/vdwpoints_{density}.csv"))
+            if pointfile is not None:
+                self.vdwpoints = np.array(pd.read_csv(f"vdwpoints/{pointfile}"))
+            else:
+                self.vdwpoints = np.array(pd.read_csv(f"vdwpoints/vdwpoints_{density}.csv"))
         except FileNotFoundError:
             print("No such density file present in directory. Check directory for available variant")
             sys.exit(1)
@@ -108,19 +111,20 @@ class Can:
             # lower importance of this parameter if point reached std deviation interval
             if self.upper[v] > v > self.lower[v]:
                 value_fitness_std += (((new_pots[v] - self.experimental_potentials[
-                    v]) / self.experimental_potentials.mean()) ** 2) / 100  # normalized
+                    v]) / self.experimental_potentials.mean()) ** 2) / 1  # normalized
 
-            # if point doesn't reach std deviation interval the importance is higher
+            # if point didn't reach std deviation interval the importance is higher
             else:
                 value_fitness_std += (((new_pots[v] - self.experimental_potentials[
                     v]) / self.experimental_potentials.mean()) ** 2)  # normalized
 
         # derivative similarity
         deriv_fitness = sum(
-            ((new_deriv - self.experimental_derivative) / self.experimental_derivative.mean()) ** 2)  # normalized
+            ((new_deriv - self.experimental_derivative) / self.experimental_derivative.mean()) ** 2) # normalized
 
-        return (value_fitness_std,
-                deriv_fitness,)  # tuple
+        fitness = value_fitness_std + deriv_fitness
+
+        return (fitness,)  # tuple
 
     def plot(self, ax: plt.axes, ax3d: plt.axes, best: np.ndarray, other: np.ndarray, charges: np.ndarray) -> None:
         """
@@ -139,8 +143,8 @@ class Can:
                         label="std. deviation")  # standard deviation
 
         # derivative plot, uncomment if needed
-        # ax.plot(np.arange(25), self.experimental_derivative, c="green")
-        # ax.plot(np.arange(25), discrete_derivative(best), c="red")
+        ax.plot(np.arange(25), self.experimental_derivative, c="green")
+        ax.plot(np.arange(25), discrete_derivative(best), c="red")
 
         if not self.low_detail:
             # other individuals (a lot of grey lines)
@@ -208,7 +212,7 @@ class Can:
         npoints = len(self.vdwpoints)  # number of points
         hof = tools.HallOfFame(maxsize=hof_size)
 
-        creator.create("FitnessMax", base.Fitness, weights=(-1.0, -1.0,))  # fitness weights
+        creator.create("FitnessMax", base.Fitness, weights=(-1.0,))  # fitness weights
         creator.create("Individual", list, fitness=creator.FitnessMax)
 
         toolbox = base.Toolbox()
@@ -248,6 +252,11 @@ class Can:
 
             ax.clear()
             ax3d.clear()
+
+            # try:
+            #     print(hof.items[0].fitness)
+            # except IndexError:
+            #     pass
 
             try:
                 new_best = self.evaluate_potentials(hof.items[0])

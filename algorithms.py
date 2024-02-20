@@ -146,11 +146,15 @@ def mut_gaussian_degr(individual, mu, sigma, indpb):
 
     for i, m, s in zip(range(size), mu, sigma):
         if random.random() < indpb:
-            if individual[i] == 0:
-                individual[i] += random.gauss(m, s)
-            elif random.random() < 0.1:
+            if random.random() < 0.5:
                 individual[i] = 0
             else:
                 individual[i] += random.gauss(m, s)
+            # if individual[i] == 0:
+            #     individual[i] += random.gauss(m, s)
+            # elif random.random() < 0.1:
+            #     individual[i] = 0
+            # else:
+            #     individual[i] += random.gauss(m, s)
 
     return individual,
