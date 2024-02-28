@@ -302,7 +302,7 @@ class Can:
 
         print(f"\nSimulation finished in {round((time.time() - start_time))} seconds\n")
 
-        best = list(hof.items[0])
+        best = hof.items[0]
         print(f"Best charges:\n{best}")
 
         # Video rendering from frames
@@ -324,7 +324,7 @@ class Can:
         charged_points = pd.DataFrame(self.vdwpoints)
         distances_charged = self.distances_df
 
-        charged_points["charge"] = best
+        charged_points.insert(0, "charge", best)
         # charged_points_only = charged_points[charged_points["charge"] != 0]
         distances_charged["charge"] = best
         # distances_charged_only = distances_charged[distances_charged["charge"] != 0]

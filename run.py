@@ -14,10 +14,10 @@ tournsize - число особей для турнирного отбора. Я
 hof_size - размер зала славы. В нем сохраняются лучшие решения, чтобы не терять их и не переоткрывать повторно
 """
 
-can = Can(max_charge=0.01, density=25, mdfile='WT_pots.xlsx', mkdir=True, low_detail=False)
-can.genetic_algorithm(population_size=250,
+can = Can(max_charge=0.1, density=1, mdfile='WT_pots.xlsx', mkdir=True, low_detail=False)
+can.genetic_algorithm(population_size=50,
                       p_crossover=0.9,
                       p_mutation=0.4,
-                      max_generations=1000,
-                      tournsize=15,
-                      hof_size=5)
+                      max_generations=2500,
+                      tournsize=5,
+                      hof_size=2)
