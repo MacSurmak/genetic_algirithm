@@ -21,7 +21,7 @@ except ImportError:
 
 
 class Can:
-    def __init__(self, mdfile='WT_pots.xlsx', pointfile=None, mkdir=False, max_charge=0.1, density=1, low_detail=False):
+    def __init__(self, mdfile='WT_pots.xlsx', pointfile=None, mkdir=False, max_charge=0.1, density=1, r=1, low_detail=False):
         """
         Creates object
         :param mdfile: name of MD potentials file
@@ -36,6 +36,7 @@ class Can:
         self.generation = 0
         self.basename = mdfile.split('.')[0]
         self.low_detail = low_detail
+        self.r = r
 
         self.names = ["O4", "C3", "C2", "C10", "C11", "C12", "C13", "C15", "C16",
                       "C17", "C18", "C20", "C21", "C22", "C23", "C24", "C26", "C27",
@@ -61,17 +62,23 @@ class Can:
 
         try:
             if pointfile is not None:
-                self.vdwpoints = np.array(pd.read_csv(f"vdwpoints/{pointfile}"))
+                self.vdwpoints = np.array(pd.read_csv(f"vdwpoints/{pointfile}").drop(["charge"], axis=1))
             else:
-                self.vdwpoints = np.array(pd.read_csv(f"vdwpoints/vdwpoints_{density}.csv"))
+                self.vdwpoints = np.array(pd.read_csv(f"vdwpoints/vdwpoints_{r}r_{density}d.csv"))
         except FileNotFoundError:
             print("No such density file present in directory. Check directory for available variant")
             sys.exit(1)
 
         try:
-            self.start_charges = np.array(pd.read_csv(f"vdwpoints/distances_{density}.csv")["charge"])
-            self.distances_df = pd.read_csv(f"vdwpoints/distances_{density}.csv").drop(["charge", "Unnamed: 0"], axis=1)
-            self.distances_df_inv = (1 / (self.distances_df * 1.889725988579)).T  # converted to bohrs
+            if pointfile is not None:
+                self.start_charges = np.array(pd.read_csv(f"vdwpoints/{pointfile}")["charge"])
+                self.distances_df = pd.read_csv(f"vdwpoints/distances_{pointfile}").drop(
+                    ["charge"], axis=1)
+                self.distances_df_inv = (1 / (self.distances_df * 1.889725988579)).T  # converted to bohrs
+            else:
+                self.start_charges = np.array(pd.read_csv(f"vdwpoints/distances_{r}r_{density}d.csv")["charge"])
+                self.distances_df = pd.read_csv(f"vdwpoints/distances_{r}r_{density}d.csv").drop(["charge", "Unnamed: 0"], axis=1)
+                self.distances_df_inv = (1 / (self.distances_df * 1.889725988579)).T  # converted to bohrs
         except FileNotFoundError:
             print("No such density file present in directory. Check directory for available variant")
             sys.exit(1)
@@ -151,6 +158,19 @@ class Can:
             for i in other:
                 ax.plot(np.arange(26), i, alpha=.01, color="grey")
 
+        major_ticks_x = np.arange(-5, 30, 5)
+        minor_ticks_x = np.arange(-5, 30, 1)
+        major_ticks_y = np.arange(-0.3, 0.1, 0.05)
+        minor_ticks_y = np.arange(-0.3, 0.1, 0.01)
+
+        ax.set_xticks(major_ticks_x)
+        ax.set_xticks(minor_ticks_x, minor=True)
+        ax.set_yticks(major_ticks_y)
+        ax.set_yticks(minor_ticks_y, minor=True)
+
+        ax.grid(which='major', linestyle='dashed', linewidth='1')
+        ax.grid(which='minor', linestyle=':', linewidth='0.1', color='black')
+
         # best individual (orange line)
         ax.plot(np.arange(26), best, label="predicted")
 
@@ -175,6 +195,7 @@ class Can:
             self.cb = True
 
         ax.legend(loc="lower left")
+        ax.set_xlim(0, 25)
         ax.set_ylim(-0.25, 0.05)
         ax3d.set_xlim(-15, 15)
         ax3d.set_ylim(-15, 15)
@@ -206,8 +227,8 @@ class Can:
         if self.mkdir:
             self.working_dir = (f"output/{date_time_str}_{len(self.vdwpoints)}_points_{population_size}_"
                                 f"inds_{max_generations}_gens_{p_mutation}_pm_{p_crossover}_pc")
-            os.mkdir(self.working_dir)
-            os.mkdir(f"{self.working_dir}/figures")
+            os.makedirs(self.working_dir)
+            os.makedirs(f"{self.working_dir}/figures")
 
         npoints = len(self.vdwpoints)  # number of points
         hof = tools.HallOfFame(maxsize=hof_size)
@@ -300,7 +321,7 @@ class Can:
 
         maxFitnessValues, meanFitnessValues = logbook.select("best", "avg")
 
-        print(f"\nSimulation finished in {round((time.time() - start_time))} seconds\n")
+        print(f"\nSimulation completed in {round((time.time() - start_time))} seconds\n")
 
         best = hof.items[0]
         print(f"Best charges:\n{best}")
@@ -331,7 +352,7 @@ class Can:
 
         # saving logs and results
         if self.mkdir:
-            charged_points.to_csv(f'{self.working_dir}/charged_points.csv', index=False)
+            charged_points.to_csv(f'{self.working_dir}/vdwPC_{len(self.vdwpoints)}_{self.r}r.csv', index=False)
             distances_charged.to_csv(f'{self.working_dir}/distances_charged.csv', index=False)
             # charged_points_only.to_csv(f'{self.working_dir}/charged_points_only.csv', index=False)
             # distances_charged_only.to_csv(f'{self.working_dir}/distances_charged_only.csv', index=False)

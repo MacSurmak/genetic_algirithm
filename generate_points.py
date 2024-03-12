@@ -11,7 +11,7 @@ from pyvdwsurface import vdwsurface
 from scipy.spatial import distance
 
 
-def generate(filename="can.xyz", density=1) -> None:
+def generate(filename="data/can.xyz", density=1, radius=1) -> None:
     """
     Generates points on a VDW surface with given density
     :param filename: molecule file name
@@ -29,8 +29,8 @@ def generate(filename="can.xyz", density=1) -> None:
         z = zs[i]
         atoms.append([x, y, z])
     atoms = np.array(atoms)
-    vdwpoints = pd.DataFrame(vdwsurface(atoms, elements, density=density))
-    vdwpoints.to_csv(f'vdwpoints/vdwpoints_{density}.csv', index=False)
+    vdwpoints = pd.DataFrame(vdwsurface(atoms, elements, density=density, scale_factor=radius))
+    vdwpoints.to_csv(f'vdwpoints/vdwpoints_{radius}r_{density}d.csv', index=False)
 
     chain_coordinates = []
     for i in [14, 13, 11, 10, 9, 8, 6, 5, 4, 3, 2, 20, 21, 22, 23, 24, 26, 27, 28, 29, 31, 32, 33, 34, 36, 37]:
@@ -51,6 +51,7 @@ def generate(filename="can.xyz", density=1) -> None:
         counter += 1
 
     distances_df["charge"] = np.zeros(len(distances_df))
-    distances_df.to_csv(f"vdwpoints/distances_{density}.csv")
+    distances_df.to_csv(f"vdwpoints/distances_{radius}r_{density}d.csv")
 
-generate(density=50)
+
+generate(density=1, radius=1.2)
