@@ -1,12 +1,15 @@
 import random
 import time
 import numpy as np
+import datetime
 
 from itertools import repeat
 
 import pandas as pd
 from deap import tools
 from deap.algorithms import varAnd
+from collections import deque
+from time import gmtime, strftime
 
 try:
     from collections.abc import Sequence
@@ -64,7 +67,7 @@ def ea_simple_elitism(population, toolbox, cxpb, mutpb, ngen, stats=None,
     time_start = time.time()
 
     logbook = tools.Logbook()
-    logbook.header = ['gen', 'nevals', 'time'] + (stats.fields if stats else [])
+    logbook.header = ['gen', 'nevals', 'time', 'time_left', 'ETA'] + (stats.fields if stats else [])
 
     # Evaluate the individuals with an invalid fitness
     invalid_ind = [ind for ind in population if not ind.fitness.valid]
@@ -81,12 +84,21 @@ def ea_simple_elitism(population, toolbox, cxpb, mutpb, ngen, stats=None,
 
     record = stats.compile(population) if stats else {}
     dur = round(time.time() - time_start, 2)
-    logbook.record(gen=0, nevals=len(invalid_ind), time=dur, **record)
+    left = dur * ngen
+    eta = (datetime.datetime.now() + datetime.timedelta(seconds=left)).timetuple()
+    eta = strftime("%H:%M", eta)
+    left = f"{str(int(left // 60)).zfill(2)}:{str(int(left % 60)).zfill(2)}"
+    logbook.record(gen=0, nevals=len(invalid_ind), time=dur, time_left=left, ETA=eta, **record)
     if verbose:
         print(logbook.stream)
 
+    durs = deque(maxlen=50)
+    gen = 1
+
     # Begin the generational process
     for gen in range(1, ngen + 1):
+
+        gen += 1
 
         time_start = time.time()
 
@@ -117,7 +129,14 @@ def ea_simple_elitism(population, toolbox, cxpb, mutpb, ngen, stats=None,
         # Append the current generation statistics to the logbook
         record = stats.compile(population) if stats else {}
         dur = round(time.time() - time_start, 2)
-        logbook.record(gen=gen, nevals=len(invalid_ind), time=dur, **record)
+        durs.append(dur)
+        avg_dur = np.array(durs).mean()
+        print(ngen - gen)
+        left = (ngen - gen) * avg_dur
+        eta = (datetime.datetime.now() + datetime.timedelta(seconds=left)).timetuple()
+        eta = strftime("%H:%M", eta)
+        left = f"{str(int(left // 60)).zfill(2)}:{str(int(left % 60)).zfill(2)}"
+        logbook.record(gen=gen, nevals=len(invalid_ind), time=dur, time_left=left, ETA=eta, **record)
 
         if verbose:
             print(logbook.stream)
