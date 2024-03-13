@@ -92,11 +92,11 @@ def ea_simple_elitism(population, toolbox, cxpb, mutpb, ngen, stats=None,
     if verbose:
         print(logbook.stream)
 
-    durs = deque(maxlen=50)
-    gen = 1
+    durs = deque(maxlen=int(ngen/10))
+    gen = 0
 
     # Begin the generational process
-    for gen in range(1, ngen + 1):
+    for generation in range(1, ngen + 1):
 
         gen += 1
 
@@ -131,12 +131,11 @@ def ea_simple_elitism(population, toolbox, cxpb, mutpb, ngen, stats=None,
         dur = round(time.time() - time_start, 2)
         durs.append(dur)
         avg_dur = np.array(durs).mean()
-        print(ngen - gen)
-        left = (ngen - gen) * avg_dur
+        left = avg_dur * (ngen - gen)
         eta = (datetime.datetime.now() + datetime.timedelta(seconds=left)).timetuple()
         eta = strftime("%H:%M", eta)
         left = f"{str(int(left // 60)).zfill(2)}:{str(int(left % 60)).zfill(2)}"
-        logbook.record(gen=gen, nevals=len(invalid_ind), time=dur, time_left=left, ETA=eta, **record)
+        logbook.record(gen=generation, nevals=len(invalid_ind), time=dur, time_left=left, ETA=eta, **record)
 
         if verbose:
             print(logbook.stream)
